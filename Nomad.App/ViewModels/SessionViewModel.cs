@@ -2313,10 +2313,6 @@ public sealed partial class SessionViewModel : ObservableObject
     public string ChatKey { get; } = Guid.NewGuid().ToString("N");
 
     /// <summary>
-    /// A message from another chat: sent now when this one is idle (starting its agent if it stopped), queued behind the running
-    /// turn otherwise, like a prompt typed meanwhile.
-    /// </summary>
-    /// <summary>
     /// A message from elsewhere (another chat's send_to_chat): into the running turn when Claude Code can take it in at its next
     /// step, as one typed here would go; otherwise queued, and sent at once when no turn runs. Returns whether it went into the
     /// running turn.
@@ -2325,8 +2321,7 @@ public sealed partial class SessionViewModel : ObservableObject
     {
         if (CanSteer && !text.TrimStart().StartsWith('/') && _backend is ClaudeCodeBackend { IsProcessRunning: true })
         {
-            await SteerAsync(text, []);
-            return true;
+            return await SteerAsync(text, []); // Queued instead when it couldn't be written.
         }
 
         Queue(text, []);
@@ -2334,9 +2329,9 @@ public sealed partial class SessionViewModel : ObservableObject
         return false;
     }
 
-    public void Queue(string text, IReadOnlyList<Attachment> attachments)
+    public void Queue(string text, IReadOnlyList<Attachment> attachments, (string Uuid, string From)? relayed = null)
     {
-        Queued.Add(new QueuedPrompt(text, attachments));
+        Queued.Add(new QueuedPrompt(text, attachments) { Relayed = relayed });
         OnPropertyChanged(nameof(HasQueued));
     }
 
@@ -2433,9 +2428,12 @@ public sealed partial class SessionViewModel : ObservableObject
 
         var text = string.Join("\n\n", Queued.Select(q => q.Text).Where(t => t.Length > 0));
         var attachments = Queued.SelectMany(q => q.Attachments).ToList();
+
+        // A watching PC's prompt going out alone stays that PC's; merged with others, it goes out as this PC's.
+        var relayed = Queued.Count == 1 ? Queued[0].Relayed : null;
         Queued.Clear();
         OnPropertyChanged(nameof(HasQueued));
-        await SendPromptAsync(text, attachments);
+        await SendPromptAsync(text, attachments, relayed);
     }
 
     // ------------------------------------------------------------------ slash commands
@@ -2834,7 +2832,7 @@ public sealed partial class SessionViewModel : ObservableObject
             // A slash command runs as a turn of its own once this one ends: it waits in the queue as before.
             if (CanSteer && !_queueOnly && !text.TrimStart().StartsWith('/') && _backend is ClaudeCodeBackend { IsProcessRunning: true })
             {
-                await SteerAsync(text, images);
+                _ = await SteerAsync(text, images);
             }
             else
             {
@@ -2885,7 +2883,8 @@ public sealed partial class SessionViewModel : ObservableObject
     /// Sends a prompt into the turn Claude Code is running, as its terminal does with one typed mid-turn: the CLI takes it at
     /// its next step and carries on, so the turn and its state stay as they are.
     /// </summary>
-    private async Task SteerAsync(string text, IReadOnlyList<Attachment> attachments)
+    /// <returns>Whether it went in; when it couldn't be written (the process ended just then), it waits in the queue instead.</returns>
+    private async Task<bool> SteerAsync(string text, IReadOnlyList<Attachment> attachments)
     {
         var images = attachments.Where(a => a.IsImage).ToList();
         var files = attachments.Where(a => a.IsFile).ToList();
@@ -2899,22 +2898,41 @@ public sealed partial class SessionViewModel : ObservableObject
         Items.Add(message);
         ContentChanged?.Invoke();
         _main.OnSessionActivity(this);
+        var uuid = Guid.NewGuid().ToString();
         try
         {
             var sent = AttachedFiles.AddTo(text, files.Select(f => f.Path!));
-            var uuid = Guid.NewGuid().ToString();
             _steered[uuid] = message;
             await ((ClaudeCodeBackend)_backend!).SteerAsync(sent, images.Select(i => i.Image!).ToList(), uuid);
-            _relay?.PublishPrompt(sent, uuid);
+            try
+            {
+                _relay?.PublishPrompt(sent, uuid);
+            }
+            catch (Exception)
+            {
+                // Watching PCs miss it; the turn already has it, so it must not be queued a second time.
+            }
+
+            return true;
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            Items.Add(new ErrorItem(ex.Message));
+            // Not lost: it waits in the queue, as it would have before, and goes out with the next prompt.
+            _steered.Remove(uuid);
+            Items.Remove(message);
+            Queue(text, attachments);
+            if (!IsTurnRunning)
+            {
+                await SendQueuedAsync();
+            }
+
             ContentChanged?.Invoke();
+            return false;
         }
     }
 
-    public async Task SendPromptAsync(string text, IReadOnlyList<Attachment>? attachments = null)
+    /// <param name="relayed">For a watching PC's prompt: its id and name, which viewers are told so it shows as that PC's, once.</param>
+    public async Task SendPromptAsync(string text, IReadOnlyList<Attachment>? attachments = null, (string Uuid, string From)? relayed = null)
     {
         attachments ??= [];
         var images = attachments.Where(a => a.IsImage).ToList();
@@ -2929,11 +2947,12 @@ public sealed partial class SessionViewModel : ObservableObject
         }
 
         CloseGroup();
-        var uuid = Guid.NewGuid().ToString();
+        var uuid = relayed?.Uuid ?? Guid.NewGuid().ToString();
         var message = new UserMessageItem(text, IsAntigravity ? null : uuid, DateTime.UtcNow, seen: false)
         {
             Images = images.Select(i => i.Preview!).ToList(),
             Files = files,
+            FromDevice = relayed?.From,
 
             // Codex keeps the id with the prompt, so it can rewind or fork to just before it.
             ParentUuid = IsCodex ? uuid : null,
@@ -2957,6 +2976,11 @@ public sealed partial class SessionViewModel : ObservableObject
             }
 
             await EnsureBackendAsync();
+            if (relayed is { } from)
+            {
+                _relay?.ExpectPrompt(from.Uuid, from.From); // The publisher is the one EnsureBackendAsync attached.
+            }
+
             await _backend!.SendPromptAsync(text, message.Uuid, images.Select(i => i.Image!).ToList());
 
             // The process now holds the rewind / fork point and the transcript will record it.

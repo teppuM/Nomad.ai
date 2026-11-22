@@ -144,7 +144,27 @@ public sealed partial class SessionViewModel
                     _steered[steeredUuid] = steered;
                     ContentChanged?.Invoke();
                     _main.OnSessionActivity(this);
-                    await claude.SteerAsync(text, input.Images, steeredUuid);
+                    try
+                    {
+                        await claude.SteerAsync(text, input.Images, steeredUuid);
+                    }
+                    catch (Exception)
+                    {
+                        // Not lost: it waits in the queue, as one typed here would, and goes out with the next prompt.
+                        _steered.Remove(steeredUuid);
+                        Items.Remove(steered);
+                        var images = (input.Images ?? []).Select((i, n) => PromptImages.FromBytes(i.Data, i.MediaType, $"image {n + 1}"))
+                            .OfType<Attachment>();
+                        Queue(shown, [.. files, .. images], (steeredUuid, from));
+                        if (!IsTurnRunning)
+                        {
+                            await SendQueuedAsync();
+                        }
+
+                        ContentChanged?.Invoke();
+                        break;
+                    }
+
                     _relay?.PublishPrompt(text, steeredUuid, from);
                     break;
 

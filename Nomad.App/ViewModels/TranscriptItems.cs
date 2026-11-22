@@ -117,6 +117,9 @@ public sealed partial class QueuedPrompt(string text, IReadOnlyList<Attachment> 
 
     public IReadOnlyList<Attachment> Attachments { get; } = attachments;
 
+    /// <summary>A watching PC's prompt (its id and name), so viewers see it as that PC's when it goes out; null for one typed here.</summary>
+    public (string Uuid, string From)? Relayed { get; init; }
+
     /// <summary>"Fix the tests", "2 images" or "an image and a file".</summary>
     public string Label => Text.Length > 0 ? Text.ReplaceLineEndings(" ") : AttachmentsText;
 

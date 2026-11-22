@@ -5,7 +5,8 @@ namespace Nomad.App.ViewModels;
 
 /// <summary>
 /// The chats open in this window, for the chat tools: what <c>list_chats</c> shows and where <c>send_to_chat</c> delivers. A message
-/// goes through the target chat's own queue, so it never cuts into a running turn.
+/// goes into a Claude Code chat's running turn (read at its next step, as one typed there would be), else through the target
+/// chat's own queue.
 /// </summary>
 internal sealed class ChatDirectory(MainViewModel main) : IChatDirectory
 {
@@ -32,7 +33,7 @@ internal sealed class ChatDirectory(MainViewModel main) : IChatDirectory
         .ToList();
 
     /// <summary>
-    /// Finds the target, counts the send against the caller's limit and queues the message there; returns what to tell the sender.
+    /// Finds the target, counts the send against the caller's limit and delivers the message there; returns what to tell the sender.
     /// </summary>
     private async Task<string> SendOnUiAsync(string? callerKey, string target, string message)
     {
