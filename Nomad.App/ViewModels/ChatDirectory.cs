@@ -46,10 +46,10 @@ internal sealed class ChatDirectory(MainViewModel main) : IChatDirectory
         }
 
         var busy = chat.IsTurnRunning;
-        await chat.ReceiveMessageAsync(ChatTools.Envelope(sender is null ? null : Info(sender), message));
+        var intoTurn = await chat.ReceiveMessageAsync(ChatTools.Envelope(sender is null ? null : Info(sender), message));
 
-        return busy
-            ? $"Queued for \"{chat.Title}\": it is in a turn and gets the message when that ends."
+        return intoTurn ? $"Delivered into \"{chat.Title}\"'s running turn: it reads it at its next step."
+            : busy ? $"Queued for \"{chat.Title}\": it is in a turn and gets the message when that ends."
             : $"Delivered to \"{chat.Title}\", which is working on it now.";
     }
 

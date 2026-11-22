@@ -2316,10 +2316,22 @@ public sealed partial class SessionViewModel : ObservableObject
     /// A message from another chat: sent now when this one is idle (starting its agent if it stopped), queued behind the running
     /// turn otherwise, like a prompt typed meanwhile.
     /// </summary>
-    public async Task ReceiveMessageAsync(string text)
+    /// <summary>
+    /// A message from elsewhere (another chat's send_to_chat): into the running turn when Claude Code can take it in at its next
+    /// step, as one typed here would go; otherwise queued, and sent at once when no turn runs. Returns whether it went into the
+    /// running turn.
+    /// </summary>
+    public async Task<bool> ReceiveMessageAsync(string text)
     {
+        if (CanSteer && !text.TrimStart().StartsWith('/') && _backend is ClaudeCodeBackend { IsProcessRunning: true })
+        {
+            await SteerAsync(text, []);
+            return true;
+        }
+
         Queue(text, []);
         if (!IsTurnRunning) await SendQueuedAsync();
+        return false;
     }
 
     public void Queue(string text, IReadOnlyList<Attachment> attachments)
