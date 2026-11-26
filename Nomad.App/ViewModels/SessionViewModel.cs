@@ -7,6 +7,8 @@ using Nomad.Core.Agents;
 using Nomad.Core.Git;
 using Nomad.Core.Hub;
 using Nomad.Core.Sessions;
+using Nomad.Core.Settings;
+using Nomad.Core.Text;
 
 namespace Nomad.App.ViewModels;
 
@@ -4047,7 +4049,8 @@ public sealed partial class SessionViewModel : ObservableObject
 
                 break;
 
-            case TurnStartedEvent:
+            case TurnStartedEvent started:
+                _turnPrompt = started.Prompt;
                 _stopRequested = false;
                 RefreshSteerHints();
                 IsTurnRunning = true;
@@ -4056,6 +4059,7 @@ public sealed partial class SessionViewModel : ObservableObject
                 break;
 
             case TurnResumedEvent:
+                _turnPrompt = null; // Claude Code went on by itself: a background task's notice.
                 _stopRequested = false;
                 RefreshSteerHints();
                 IsTurnRunning = true;
@@ -4709,6 +4713,55 @@ public sealed partial class SessionViewModel : ObservableObject
         {
             Dispatcher.UIThread.Post(() => _ = SendQueuedAsync());
         }
+        else if (CompactsAtTurnEnd(result))
+        {
+            Dispatcher.UIThread.Post(() => _ = CompactAtTurnEndAsync());
+        }
+    }
+
+    // The prompt that started the running turn; null for a turn Claude Code started by itself.
+    private string? _turnPrompt;
+
+    // The running turn is the /compact this chat sent at a turn's end, so its own end sends none.
+    private bool _compactingAtTurnEnd;
+
+    /// <summary>
+    /// Whether the turn just ended calls for /compact now (Settings › Compact at the end of a turn): a Claude Code turn that
+    /// finished normally after a prompt of the user's (not a background task's notice, another chat's message or a slash
+    /// command), with nothing queued or waiting and the context at or above the setting's size.
+    /// </summary>
+    private bool CompactsAtTurnEnd(TurnResult result)
+    {
+        var prompt = _turnPrompt;
+        var wasCompact = _compactingAtTurnEnd;
+        _turnPrompt = null;
+        _compactingAtTurnEnd = false;
+        var settings = _main.Settings;
+        return settings.CompactAtTurnEnd && IsClaudeCode && !wasCompact && !result.Interrupted && !result.IsError
+               && Queued.Count == 0 && PendingPermission is null && _pendingFolderMove is null
+               && ContextTokens >= Math.Clamp(settings.CompactAtTurnEndTokens, NomadSettings.MinCompactAtTurnEndTokens, NomadSettings.MaxCompactAtTurnEndTokens)
+               && prompt is { } text && IsUsersOwnPrompt(text);
+    }
+
+    /// <summary>A prompt the user wrote, as opposed to a slash command, a background task's notice or another chat's message.</summary>
+    internal static bool IsUsersOwnPrompt(string prompt)
+    {
+        var text = prompt.TrimStart();
+        return text.Length > 0 && !text.StartsWith('/') && !text.StartsWith("<task-notification>", StringComparison.Ordinal)
+               && ChatOrigins.Parse(text) is null && !text.StartsWith("Message from another chat", StringComparison.Ordinal);
+    }
+
+    private async Task CompactAtTurnEndAsync()
+    {
+        // Something may have come in since the turn ended: a prompt typed or queued goes first, and this waits for the next end.
+        if (IsTurnRunning || Queued.Count > 0 || !IsClaudeCode)
+        {
+            return;
+        }
+
+        _compactingAtTurnEnd = true;
+        Items.Add(new NoticeItem($"Compacting at the end of the turn: {Format.Tokens(ContextTokens)} in context"));
+        await SendPromptAsync("/compact");
     }
 
     private string? _pendingFolderMove;

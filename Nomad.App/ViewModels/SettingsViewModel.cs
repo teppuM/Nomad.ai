@@ -114,6 +114,9 @@ public sealed partial class SettingsViewModel : ObservableObject
         AutoUpdate = s.AutoUpdate;
         AutoArchive = s.AutoArchive;
         SleepIdle = s.SleepIdleSessions;
+        CompactAtTurnEnd = s.CompactAtTurnEnd;
+        CompactAtTurnEndThousandsText = (Math.Clamp(s.CompactAtTurnEndTokens, NomadSettings.MinCompactAtTurnEndTokens, NomadSettings.MaxCompactAtTurnEndTokens) / 1000)
+            .ToString(System.Globalization.CultureInfo.InvariantCulture);
         SleepAfterHoursText = Math.Clamp(s.SleepAfterHours, 1, NomadSettings.MaxSleepAfterHours).ToString(System.Globalization.CultureInfo.InvariantCulture);
         RememberWindowPlacement = s.RememberWindowPlacement;
         CloseToTray = s.CloseToTray;
@@ -913,6 +916,29 @@ public sealed partial class SettingsViewModel : ObservableObject
     }
 
     private Avalonia.Threading.DispatcherTimer? _sleepDelay;
+
+    /// <summary>Whether a Claude Code chat is compacted at the end of a turn once its context reaches the size below.</summary>
+    [ObservableProperty]
+    public partial bool CompactAtTurnEnd { get; set; }
+
+    /// <summary>That size in thousands of tokens, as typed: saved while it is in range, so typing "380" passes "3" harmlessly.</summary>
+    [ObservableProperty]
+    public partial string CompactAtTurnEndThousandsText { get; set; } = "380";
+
+    [RelayCommand]
+    private void ToggleCompactAtTurnEnd() => CompactAtTurnEnd = !CompactAtTurnEnd;
+
+    partial void OnCompactAtTurnEndChanged(bool value) => Apply(s => s.CompactAtTurnEnd = value, appearance: false);
+
+    partial void OnCompactAtTurnEndThousandsTextChanged(string value)
+    {
+        if (int.TryParse(value.Trim(), System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out var thousands)
+            && thousands * 1000L is var tokens
+            && tokens >= NomadSettings.MinCompactAtTurnEndTokens && tokens <= NomadSettings.MaxCompactAtTurnEndTokens)
+        {
+            Apply(s => s.CompactAtTurnEndTokens = (int)tokens, appearance: false);
+        }
+    }
 
     partial void OnAutoArchiveChanged(bool value)
     {

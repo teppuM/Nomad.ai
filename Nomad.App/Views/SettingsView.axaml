@@ -428,6 +428,38 @@
                   <TextBlock Text="hours" Classes="rowhint" VerticalAlignment="Center" />
                 </StackPanel>
               </Grid>
+              <Border Classes="rowline" />
+
+              <Grid Classes="row" ColumnDefinitions="*,Auto">
+                <StackPanel VerticalAlignment="Center" Margin="0,12">
+                  <TextBlock Text="Compact at the end of a turn" Classes="rowlabel" />
+                  <TextBlock Text="When a Claude Code turn ends with the context at or above the size below, send /compact before the next prompt, so compaction doesn't land in the middle of the next turn. Not after a background task's notice, a message from another chat, a stopped or failed turn, or with prompts queued. Claude Code's own limit still applies within a long turn."
+                             Classes="rowhint" />
+                </StackPanel>
+                <Button Grid.Column="1"
+                        Theme="{StaticResource FlatButton}"
+                        Padding="6"
+                        VerticalAlignment="Center"
+                        Command="{Binding ToggleCompactAtTurnEndCommand}">
+                  <Border Classes="switch large" Classes.on="{Binding CompactAtTurnEnd}">
+                    <Ellipse />
+                  </Border>
+                </Button>
+              </Grid>
+              <Border Classes="rowline" />
+
+              <Grid Classes="row" ColumnDefinitions="*,Auto" IsEnabled="{Binding CompactAtTurnEnd}">
+                <StackPanel VerticalAlignment="Center" Margin="0,12">
+                  <TextBlock Text="Compact from" Classes="rowlabel" />
+                  <TextBlock Text="Context size, in thousands of tokens, from which a finished turn is followed by /compact (50 to 2,000)." Classes="rowhint" />
+                </StackPanel>
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                  <Border Classes="field" Width="72">
+                    <TextBox Theme="{StaticResource BareTextBox}" Text="{Binding CompactAtTurnEndThousandsText}" Watermark="380" TextAlignment="Right" FontSize="{DynamicResource UiFontSize}" />
+                  </Border>
+                  <TextBlock Text="thousand" Classes="rowhint" VerticalAlignment="Center" />
+                </StackPanel>
+              </Grid>
 
               <TextBlock Classes="rowhint" Margin="0,28,0,0" FontSize="{DynamicResource UiFontSizeSmall}">
                 <Run Text="Settings are saved to" />

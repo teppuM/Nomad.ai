@@ -261,6 +261,18 @@ public sealed class NomadSettings
     public const int MaxSleepAfterHours = 8760;
 
     /// <summary>
+    /// A Claude Code chat whose context has reached <see cref="CompactAtTurnEndTokens"/> is compacted when a turn ends, rather
+    /// than mid-turn when Claude Code reaches its own limit; off by default.
+    /// </summary>
+    public bool CompactAtTurnEnd { get; set; }
+
+    /// <summary>The context size, in tokens, from which a finished turn is followed by /compact.</summary>
+    public int CompactAtTurnEndTokens { get; set; } = 380_000;
+
+    /// <summary>The range <see cref="CompactAtTurnEndTokens"/> is held to.</summary>
+    public const int MinCompactAtTurnEndTokens = 50_000, MaxCompactAtTurnEndTokens = 2_000_000;
+
+    /// <summary>
     /// Session id → when it was unarchived by hand: that counts as touching it, so auto-archive waits again from
     /// then. Dropped once the session is archived again.
     /// </summary>
