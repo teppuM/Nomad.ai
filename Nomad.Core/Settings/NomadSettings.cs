@@ -34,6 +34,12 @@ public sealed class NomadSettings
     /// <summary>Under each prompt, what the user's hooks added to it (UserPromptSubmit context); off by default.</summary>
     public bool ShowHookContext { get; set; }
 
+    /// <summary>
+    /// Claude's thinking written out in place, as Claude Code's terminal shows it, instead of folded into a line or an
+    /// activity group; off by default.
+    /// </summary>
+    public bool ShowThinking { get; set; }
+
     /// <summary>The ring at the end of the status row (plan usage; spins while a turn runs, opens the usage limits).</summary>
     public bool ShowUsageRing { get; set; } = true;
 

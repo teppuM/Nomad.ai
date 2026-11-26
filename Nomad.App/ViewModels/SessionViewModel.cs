@@ -745,9 +745,10 @@ public sealed partial class SessionViewModel : ObservableObject
 
     /// <summary>
     /// The models narrate in their reasoning, so it shows as text (<see cref="ThinkingItem.IsNarration"/>). Not Codex:
-    /// it narrates in messages of its own, and its reasoning is only short summaries.
+    /// it narrates in messages of its own, and its reasoning is only short summaries. Claude's, with Show thinking on: as
+    /// its terminal shows it, so what it worked out there is never folded away behind the commands that follow.
     /// </summary>
-    private bool NarratesInThinking => IsOpenCode;
+    private bool NarratesInThinking => IsOpenCode || (IsClaudeCode && _main.ShowThinking);
 
     /// <summary>The agent menu: every backend, the current one checked.</summary>
     public IReadOnlyList<MenuOption> BackendOptions { get; } =
@@ -2254,6 +2255,30 @@ public sealed partial class SessionViewModel : ObservableObject
 
     [RelayCommand]
     private void ToggleActivity() => _main.ShowActivity = !_main.ShowActivity;
+
+    /// <summary>Claude's thinking written out in place (the setting), rather than folded.</summary>
+    public bool ShowThinking => _main.ShowThinking;
+
+    /// <summary>
+    /// Thinking that stands on its own changes at once; thinking already folded into an activity group stays there, and
+    /// shows written out once the chat is opened again.
+    /// </summary>
+    public void OnShowThinkingChanged()
+    {
+        OnPropertyChanged(nameof(ShowThinking));
+        if (IsClaudeCode)
+        {
+            foreach (var thinking in Items.OfType<ThinkingItem>())
+            {
+                thinking.IsNarration = NarratesInThinking;
+            }
+
+            ContentChanged?.Invoke();
+        }
+    }
+
+    [RelayCommand]
+    private void ToggleThinking() => _main.ShowThinking = !_main.ShowThinking;
 
     /// <summary>Show what hooks added to each prompt, folded under it.</summary>
     public bool ShowHookContext => _main.ShowHookContext;

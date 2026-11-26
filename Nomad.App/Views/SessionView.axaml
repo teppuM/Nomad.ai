@@ -2033,6 +2033,16 @@
                       </Border>
                     </Grid>
                   </Button>
+                  <!-- Claude's thinking written out in place, as its terminal shows it. -->
+                  <Button Theme="{StaticResource MenuItemButton}" Command="{Binding ToggleThinkingCommand}"
+                          ToolTip.Tip="Claude's thinking written out where it happens, as Claude Code's terminal shows it, instead of folded into the activity lines">
+                    <Grid ColumnDefinitions="*,Auto">
+                      <TextBlock Text="Show thinking" VerticalAlignment="Center" />
+                      <Border Grid.Column="1" Classes="switch" Classes.on="{Binding ShowThinking}" VerticalAlignment="Center" Margin="12,0,0,0">
+                        <Ellipse />
+                      </Border>
+                    </Grid>
+                  </Button>
                 </StackPanel>
               </Flyout>
             </Button.Flyout>

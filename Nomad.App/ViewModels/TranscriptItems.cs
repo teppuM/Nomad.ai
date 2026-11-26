@@ -201,9 +201,12 @@ public sealed partial class ThinkingItem : TranscriptItem
 
     /// <summary>
     /// The agent's models narrate their work in their reasoning (OpenCode's, Codex's), as Claude does in text between
-    /// tool calls: shown as text in the transcript, not folded into a line or an activity group.
+    /// tool calls: shown as text in the transcript, not folded into a line or an activity group. Claude's too, with Show
+    /// thinking on.
     /// </summary>
-    public bool IsNarration { get; }
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowLine), nameof(ShowNarration))]
+    public partial bool IsNarration { get; set; }
 
     /// <summary>The collapsed line: Claude's thinking, once it is done.</summary>
     public bool ShowLine => !IsNarration && !IsStreaming;

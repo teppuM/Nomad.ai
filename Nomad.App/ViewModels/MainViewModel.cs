@@ -612,6 +612,25 @@ public sealed partial class MainViewModel : ObservableObject
         }
     }
 
+    /// <summary>Claude's thinking written out in place, as the terminal shows it.</summary>
+    public bool ShowThinking
+    {
+        get => Settings.ShowThinking;
+        set
+        {
+            if (Settings.ShowThinking != value)
+            {
+                Settings.ShowThinking = value;
+                SaveSettings();
+                OnPropertyChanged();
+                foreach (var session in _open.Values.Append(Current).Distinct())
+                {
+                    session.OnShowThinkingChanged();
+                }
+            }
+        }
+    }
+
     /// <summary>The usage ring at the end of the status row.</summary>
     public bool ShowUsageRing
     {
