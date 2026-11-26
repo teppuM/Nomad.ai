@@ -374,7 +374,7 @@ public sealed partial class ChatViewModel : ObservableObject, IClosable
                 return false;
 
             case ToolCallEvent { ParentToolUseId: null } call:
-                Activity = "Using " + call.Name;
+                Activity = ActivityLine(call);
                 _newMessage = true;
                 return true;
 
@@ -389,6 +389,32 @@ public sealed partial class ChatViewModel : ObservableObject, IClosable
             default:
                 return false;
         }
+    }
+
+    /// <summary>"Bash: dotnet test" or "Read: src/App.cs": the tool and the first thing it was given, on one line.</summary>
+    internal static string ActivityLine(ToolCallEvent call)
+    {
+        string? first = null;
+        if (call.Input.ValueKind == System.Text.Json.JsonValueKind.Object)
+        {
+            foreach (var property in call.Input.EnumerateObject())
+            {
+                if (property.Value.ValueKind == System.Text.Json.JsonValueKind.String
+                    && property.Value.GetString()?.ReplaceLineEndings(" ").Trim() is { Length: > 0 } value)
+                {
+                    first = value;
+                    break;
+                }
+            }
+        }
+
+        if (first is null)
+        {
+            return "Using " + call.Name;
+        }
+
+        var cut = first.Length > 120 && char.IsHighSurrogate(first[119]) ? 119 : 120; // Never half an emoji.
+        return $"{call.Name}: {(first.Length > 120 ? first[..cut] + "…" : first)}";
     }
 
     /// <summary>
