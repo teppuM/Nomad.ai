@@ -1,9 +1,11 @@
 using Android.App;
 using Android.Content;
 using Android.Content.PM;
+using Android.Content.Res;
 using Android.OS;
 using Avalonia;
 using Avalonia.Android;
+using Nomad.Mobile.Hub;
 
 namespace Nomad.Mobile.Android;
 
@@ -33,6 +35,9 @@ public class MainActivity : AvaloniaMainActivity<App>
     {
         AppServices.Store = new AndroidSecretStore(this);
         AppServices.DefaultDeviceName = DeviceName();
+#if NOMAD_EMULATOR_TEST
+        EnrollLink.PlainHttpAllowed = url => url.Host == "10.0.2.2";
+#endif
         return base.CustomizeAppBuilder(builder).WithInterFont();
     }
 
@@ -46,6 +51,23 @@ public class MainActivity : AvaloniaMainActivity<App>
     {
         base.OnNewIntent(intent);
         OpenLink(intent);
+    }
+
+    /// <summary>
+    /// The activity keeps running through a light/dark switch (it handles UiMode itself, so the app isn't torn down); the app's
+    /// theme follows the phone's here.
+    /// </summary>
+    public override void OnConfigurationChanged(Configuration newConfig)
+    {
+        base.OnConfigurationChanged(newConfig);
+        var night = (newConfig.UiMode & UiMode.NightMask) == UiMode.NightYes;
+        Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+        {
+            if (Avalonia.Application.Current is { } app)
+            {
+                app.RequestedThemeVariant = night ? Avalonia.Styling.ThemeVariant.Dark : Avalonia.Styling.ThemeVariant.Light;
+            }
+        });
     }
 
     private static void OpenLink(Intent? intent)

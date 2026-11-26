@@ -19,8 +19,10 @@
     <NomadVersionNumber>$([System.Text.RegularExpressions.Regex]::Match('$(Version)', '^\d+\.\d+\.\d+').Value)</NomadVersionNumber>
     <ApplicationVersion Condition="'$(ApplicationVersion)' == ''">$([MSBuild]::Add($([MSBuild]::Add($([MSBuild]::Multiply($([System.Version]::Parse('$(NomadVersionNumber)').Major), 10000)), $([MSBuild]::Multiply($([System.Version]::Parse('$(NomadVersionNumber)').Minor), 100)))), $([System.Version]::Parse('$(NomadVersionNumber)').Build)))</ApplicationVersion>
     <AndroidPackageFormat>apk</AndroidPackageFormat>
-    <!-- Phones are arm64; an emulator build passes -p:RuntimeIdentifiers=android-x64. -->
-    <RuntimeIdentifiers Condition="'$(RuntimeIdentifiers)' == ''">android-arm64</RuntimeIdentifiers>
+    <!-- Phones are arm64; an emulator build passes -p:NomadAndroidAbi=android-x64. (Not -p:RuntimeIdentifiers, which would reach
+         the referenced libraries too and break their builds.) -->
+    <NomadAndroidAbi Condition="'$(NomadAndroidAbi)' == ''">android-arm64</NomadAndroidAbi>
+    <RuntimeIdentifiers>$(NomadAndroidAbi)</RuntimeIdentifiers>
     <AndroidEnableProfiledAot>false</AndroidEnableProfiledAot>
   </PropertyGroup>
 
@@ -34,6 +36,18 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Nomad.Mobile\Nomad.Mobile.csproj" />
+  </ItemGroup>
+
+  <!-- An emulator test build (-p:NomadEmulatorTest=true) may reach a local test hub over plain HTTP at 10.0.2.2, the emulator's
+       address for the PC it runs on. Nothing of this is in a normal build. -->
+  <PropertyGroup Condition="'$(NomadEmulatorTest)' == 'true'">
+    <DefineConstants>$(DefineConstants);NOMAD_EMULATOR_TEST</DefineConstants>
+  </PropertyGroup>
+  <ItemGroup Condition="'$(NomadEmulatorTest)' == 'true'">
+    <AndroidResource Include="EmulatorTest\network_security_config.xml" Link="Resources\xml\network_security_config.xml" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(NomadEmulatorTest)' != 'true'">
+    <None Remove="EmulatorTest\**" />
   </ItemGroup>
 
 </Project>
