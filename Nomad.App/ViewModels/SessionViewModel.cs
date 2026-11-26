@@ -4215,6 +4215,11 @@ public sealed partial class SessionViewModel : ObservableObject
                     thinking.Text += t.Text;
                     if (thinking.IsNarration)
                     {
+                        if (thinking.HasText)
+                        {
+                            CloseGroup(); // It has text now, so the next tool call starts a group after it.
+                        }
+
                         ContentChanged?.Invoke();
                     }
                 }
@@ -4406,8 +4411,13 @@ public sealed partial class SessionViewModel : ObservableObject
     {
         if (thinking.IsNarration)
         {
-            // Written out like text, so like text it ends the group.
-            CloseGroup();
+            // Written out like text, so like text it ends the group: once it has any. An empty block is dropped when it
+            // completes, and must not split the group it came between.
+            if (thinking.HasText)
+            {
+                CloseGroup();
+            }
+
             Items.Add(thinking);
         }
         else if (_openGroup is not null && Items.Contains(_openGroup))

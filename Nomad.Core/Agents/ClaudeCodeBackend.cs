@@ -165,7 +165,7 @@ public sealed class ClaudeCodeBackend : IAgentBackend
         var cli = RequireRunning();
         uuid ??= Guid.NewGuid().ToString();
         _sentUuids[uuid] = 0; // Its replayed copy is no Remote Control prompt.
-        var reminder = !text.TrimStart().StartsWith('/') ? MidTurnReminder + NewChatTool.Reminder : MidTurnReminder;
+        var reminder = _suggestNewChats && !text.TrimStart().StartsWith('/') ? MidTurnReminder + NewChatTool.Reminder : MidTurnReminder;
         await WriteAsync(cli, CliProtocol.UserMessage(text, uuid, images, reminder), cancellationToken).ConfigureAwait(false);
         return uuid;
     }
